@@ -71,8 +71,10 @@ app.post("/eliminar-usuario", async (req, res) => {
 // --- INICIO DEL SERVIDOR ---
 
 // Usamos el puerto que nos asigne el entorno (como Fly.io) o el 3001 si no hay ninguno definido.
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo y escuchando peticiones en el puerto ${PORT}`);
+// FORMA CORRECTA Y ROBUSTA (para Fly.io, Docker, etc.)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor listo y escuchando en el puerto ${PORT}.`);
+  console.log(`✅ Aceptando conexiones desde todas las interfaces.`);
 });
