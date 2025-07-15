@@ -5,8 +5,8 @@ import express from "express";
 import dotenv from "dotenv";
 
 // Importamos nuestras funciones de lógica de negocio desde sus módulos separados
-import { enviarCorreoDePedido } from "./servicios/enviarCorreo.js";
- import eliminarUsuario from "./servicios/eliminarUsuario.js";
+import { enviarCorreoDePedido } from ".src/servicios/enviarCorreo.js";
+ import eliminarUsuario from ".src/servicios/eliminarUsuario.js";
 
 // Cargamos las variables de entorno al inicio de todo.
 dotenv.config();
