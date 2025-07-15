@@ -1,105 +1,67 @@
 // Archivo: servidor.js
 import express from "express";
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
-// Importamos nuestra función de lógica de negocio
+// Importamos la lógica de negocio desde nuestros módulos
+import { enviarCorreoDePedido } from "./enviarCorreo.js";
 import eliminarUsuario from "./eliminarUsuario.js";
 
-// Cargar variables de entorno desde el archivo .env
+// Cargar variables de entorno. Es importante que esté al principio.
 dotenv.config();
 
 const app = express();
-app.use(express.json()); // Middleware para parsear JSON
 
-// Función para escapar caracteres HTML y prevenir ataques XSS
-function escapeHTML(str) {
-  return str.replace(/[&<>'"]/g, (tag) => ({
-      '&': '&',
-      '<': '<',
-      '>': '>',
-      "'": ''',
-      '"': '"'
-    }[tag] || tag)
-  );
-}
+// Middlewares
+app.use(express.json()); // Para parsear cuerpos de petición en formato JSON
+app.use(express.urlencoded({ extended: true })); // Para parsear cuerpos de formularios
 
-// ------------------ TRANSPORTER DE NODEMAILER ------------------
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.sendinblue.com", // o el host de Brevo que uses
-  port: 587,
-  secure: false, // true para puerto 465, false para otros
-  auth: {
-    user: process.env.BREVO_USER,
-    pass: process.env.BREVO_PASS,
-  },
-});
+// --- ENDPOINTS DE LA API ---
 
-// ------------------ ENDPOINT PARA NOTIFICAR PEDIDO ------------------
+// Endpoint para notificar un nuevo pedido por correo
 app.post("/correo", async (req, res) => {
-  // Validamos que el título venga en el body
-  if (!req.body.titulo) {
+  const { titulo } = req.body;
+
+  if (!titulo) {
     return res.status(400).json({ status: "error", mensaje: "El campo 'titulo' es requerido." });
   }
 
-  const titulo = escapeHTML(req.body.titulo);
+  const resultado = await enviarCorreoDePedido(titulo);
 
-  const mailOptions = {
-    from: '"Pedidos FullTV" <fulltvurl@gmail.com>',
-    to: "fulltvurl@gmail.com",
-    subject: `🎬 Nuevo Pedido: ${titulo}`,
-    html: `
-      <div style="font-family: sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-        <h2>🔔 Activación Pendiente</h2>
-        <p>Se ha registrado un nuevo pedido en el sistema.</p>
-        <p><strong>🎬 Título:</strong> ${titulo}</p>
-        <hr>
-        <p>Por favor, verifica y activa la película en el panel de FullTV.</p>
-      </div>
-    `,
-  };
-
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ Correo de notificación enviado:", info.response);
-    res.status(200).json({ status: "ok", mensaje: `Correo enviado con el título: ${titulo}` });
-  } catch (err) {
-    console.error("❌ Error al enviar el correo:", err);
-    res.status(500).json({ status: "error", mensaje: "Falló el envío del correo de notificación." });
+  if (resultado.status === 'ok') {
+    res.status(200).json(resultado);
+  } else {
+    // Si el servicio de correo falló, es un error del servidor.
+    res.status(502).json(resultado); // 502 Bad Gateway es apropiado si un servicio externo falla.
   }
 });
 
-// ------------------ ENDPOINT PARA ELIMINAR USUARIO ------------------
+// Endpoint para eliminar un usuario de todos los servicios
 app.post("/eliminar-usuario", async (req, res) => {
   const { uid } = req.body;
   console.log(`🟡 Petición recibida para eliminar usuario: ${uid}`);
 
   if (!uid) {
-    console.error("🔴 UID faltante en la petición.");
     return res.status(400).json({ status: "error", mensaje: "El UID del usuario es requerido." });
   }
 
-  try {
-    // Llamamos a nuestra función de lógica de negocio
-    const resultado = await eliminarUsuario(uid);
-    
-    if (resultado.status === 'ok') {
-      console.log(`✅ Usuario ${uid} eliminado exitosamente.`);
-      res.status(200).json(resultado);
-    } else {
-      console.error(`🟠 Fallo controlado al eliminar ${uid}: ${resultado.mensaje}`);
-      // Si el error fue que no se encontró, es un 404. Si no, un 500.
-      const statusCode = resultado.mensaje.includes("no existe") ? 404 : 500;
-      res.status(statusCode).json(resultado);
-    }
-  } catch (e) {
-    console.error(`🔥 Error crítico eliminando usuario ${uid}:`, e);
-    res.status(500).json({ status: "error", mensaje: "Ocurrió un error inesperado en el servidor." });
+  const resultado = await eliminarUsuario(uid);
+  
+  if (resultado.status === 'ok') {
+    return res.status(200).json(resultado);
   }
+  
+  // Determinar el código de estado HTTP correcto basado en el error
+  if (resultado.mensaje.includes("no existe")) {
+    return res.status(404).json(resultado); // 404 Not Found
+  }
+
+  // Para cualquier otro error, es un error interno del servidor
+  return res.status(500).json(resultado);
 });
 
-// ------------------ INICIAR SERVIDOR ------------------
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+// --- INICIAR SERVIDOR ---
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
 });
