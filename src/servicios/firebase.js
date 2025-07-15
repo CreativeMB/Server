@@ -1,4 +1,6 @@
+
 // Archivo: firebase.js
+const decodedCredentials = Buffer.from(process.env.FIREBASE_CREDENTIALS, 'base64').toString('utf-8');
 import admin from "firebase-admin";
 import dotenv from "dotenv";
 
