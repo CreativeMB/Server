@@ -1,67 +1,78 @@
 // Archivo: servidor.js
+
+// Importamos las librerías necesarias
 import express from "express";
 import dotenv from "dotenv";
 
-// Importamos la lógica de negocio desde nuestros módulos
+// Importamos nuestras funciones de lógica de negocio desde sus módulos separados
 import { enviarCorreoDePedido } from "./enviarCorreo.js";
 import eliminarUsuario from "./eliminarUsuario.js";
 
-// Cargar variables de entorno. Es importante que esté al principio.
+// Cargamos las variables de entorno al inicio de todo.
 dotenv.config();
 
+// Creamos la aplicación Express
 const app = express();
 
-// Middlewares
-app.use(express.json()); // Para parsear cuerpos de petición en formato JSON
-app.use(express.urlencoded({ extended: true })); // Para parsear cuerpos de formularios
+// --- MIDDLEWARES ---
+// Middleware para que Express pueda entender y parsear cuerpos de petición en formato JSON
+app.use(express.json());
 
-// --- ENDPOINTS DE LA API ---
+// --- RUTAS DE LA API (ENDPOINTS) ---
 
-// Endpoint para notificar un nuevo pedido por correo
+// Endpoint para notificar un nuevo pedido por correo electrónico
 app.post("/correo", async (req, res) => {
   const { titulo } = req.body;
 
+  // 1. Validación de la entrada
   if (!titulo) {
-    return res.status(400).json({ status: "error", mensaje: "El campo 'titulo' es requerido." });
+    return res.status(400).json({ status: "error", mensaje: "El campo 'titulo' es requerido en el cuerpo de la petición." });
   }
 
+  // 2. Delegación a la lógica de negocio
   const resultado = await enviarCorreoDePedido(titulo);
 
+  // 3. Envío de la respuesta al cliente
   if (resultado.status === 'ok') {
     res.status(200).json(resultado);
   } else {
     // Si el servicio de correo falló, es un error del servidor.
-    res.status(502).json(resultado); // 502 Bad Gateway es apropiado si un servicio externo falla.
+    res.status(500).json(resultado);
   }
 });
 
-// Endpoint para eliminar un usuario de todos los servicios
+// Endpoint para eliminar un usuario de todos los servicios de Firebase
 app.post("/eliminar-usuario", async (req, res) => {
   const { uid } = req.body;
-  console.log(`🟡 Petición recibida para eliminar usuario: ${uid}`);
+  console.log(`🟡 Petición recibida en el endpoint /eliminar-usuario para el UID: ${uid}`);
 
+  // 1. Validación de la entrada
   if (!uid) {
-    return res.status(400).json({ status: "error", mensaje: "El UID del usuario es requerido." });
+    return res.status(400).json({ status: "error", mensaje: "El campo 'uid' del usuario es requerido." });
   }
 
+  // 2. Delegación a la lógica de negocio
   const resultado = await eliminarUsuario(uid);
   
+  // 3. Envío de la respuesta al cliente con el código HTTP apropiado
   if (resultado.status === 'ok') {
     return res.status(200).json(resultado);
   }
   
-  // Determinar el código de estado HTTP correcto basado en el error
+  // Si el error es que el usuario no fue encontrado, usamos el código 404
   if (resultado.mensaje.includes("no existe")) {
     return res.status(404).json(resultado); // 404 Not Found
   }
 
-  // Para cualquier otro error, es un error interno del servidor
+  // Para cualquier otro error, es un fallo interno del servidor
   return res.status(500).json(resultado);
 });
 
-// --- INICIAR SERVIDOR ---
+// --- INICIO DEL SERVIDOR ---
+
+// Usamos el puerto que nos asigne el entorno (como Fly.io) o el 3001 si no hay ninguno definido.
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
+  console.log(`🚀 Servidor corriendo y escuchando peticiones en el puerto ${PORT}`);
 });
