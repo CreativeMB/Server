@@ -43,7 +43,7 @@ console.log("📨 Enviando a:", process.env.MAIL_TO);
     from: `"Pedidos FullTV" <${process.env.MAIL_FROM}>`, // Remitente verificado en Brevo.
     to: process.env.MAIL_TO,       
   
-    subject: `🎬 Nuevo Pedido Registrado: ${titulo}`,       // Asunto del correo.
+    subject: `🎬 Pedidos: ${titulo}`,       // Asunto del correo.
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
         <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e0e0e0;">
