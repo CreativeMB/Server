@@ -1,71 +1,74 @@
-// Archivo: eliminarUsuario.js
+// eliminarUsuario.js
 
-// Importamos las instancias YA INICIALIZADAS desde nuestro módulo central de Firebase.
-// Esto asegura que no estamos creando múltiples conexiones.
 import { auth, firestore, db } from "./firebase.js";
 
 /**
- * Elimina un usuario de todos los servicios de Firebase (Auth, Firestore, RealtimeDB)
- * y todos sus documentos relacionados, como los pedidos.
+ * Elimina completamente un usuario de Auth, Firestore y Realtime DB.
  *
- * @param {string} uid - El ID único (UID) del usuario que se va a eliminar.
- * @returns {Promise<{status: string, mensaje: string}>} Un objeto que indica el resultado de la operación.
+ * @param {string} uid - UID del usuario a eliminar.
+ * @returns {Promise<{status: string, mensaje: string}>}
  */
 export default async function eliminarUsuario(uid) {
-  // Verificación de entrada: Asegurarse de que el UID no sea nulo o indefinido.
   if (!uid) {
-    console.error("❌ Intento de eliminación sin UID.");
-    return { status: "error", mensaje: "Se requiere un UID para eliminar un usuario." };
+    return {
+      status: "error",
+      mensaje: "❌ UID requerido para eliminar el usuario."
+    };
   }
 
-  console.log(`🟡 Iniciando proceso de eliminación para el usuario con UID: ${uid}`);
+  console.log(`🟡 Iniciando eliminación completa del usuario UID: ${uid}`);
 
   try {
-    // ---- PASO 1: Eliminar de Firebase Authentication ----
-    // Este es el paso más crítico. Si falla aquí, no continuamos.
+    // 1️⃣ Eliminar de Authentication
     await auth.deleteUser(uid);
-    console.log(`✅ [Auth] Usuario eliminado exitosamente de Firebase Authentication.`);
+    console.log("✅ [Auth] Usuario eliminado de Firebase Authentication.");
 
-    // ---- PASO 2: Eliminar de Firestore (Colección 'users') ----
-    const userDocRef = firestore.collection("users").doc(uid);
-    await userDocRef.delete();
-    console.log(`✅ [Firestore] Documento del usuario eliminado de la colección 'users'.`);
+    // 2️⃣ Eliminar completamente el nodo del usuario en Realtime Database
+    const usuarioRef = db.ref("usuarios").child(uid);
+    await usuarioRef.remove();
+    console.log("✅ [Realtime DB] Nodo del usuario eliminado de /usuarios.");
 
-    // ---- PASO 3: Eliminar de Realtime Database ----
-    const userDbRef = db.ref("usuarios_conectados").child(uid);
-    await userDbRef.remove();
-    console.log(`✅ [Realtime DB] Entrada del usuario eliminada de 'usuarios_conectados'.`);
+    // 3️⃣ Eliminar todos sus pedidos en Firestore
+    const pedidosSnapshot = await firestore
+      .collection("pedidosmovies")
+      .where("userId", "==", uid)
+      .get();
 
-    // ---- PASO 4: Eliminar documentos dependientes (Pedidos) ----
-    // Usamos un 'batch' para eliminar todos los pedidos en una sola operación atómica.
-    // Esto es más eficiente y económico que eliminarlos uno por uno.
-    const pedidosQuery = firestore.collection("pedidosmovies").where("userId", "==", uid);
-    const pedidosSnapshot = await pedidosQuery.get();
-
-    if (pedidosSnapshot.empty) {
-      console.log("ℹ️ El usuario no tenía pedidos asociados para eliminar.");
-    } else {
+    if (!pedidosSnapshot.empty) {
       const batch = firestore.batch();
-      pedidosSnapshot.docs.forEach(doc => {
-        console.log(`  -> Marcando para eliminar pedido con ID: ${doc.id}`);
-        batch.delete(doc.ref);
-      });
+      pedidosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
       await batch.commit();
-      console.log(`✅ [Firestore] ${pedidosSnapshot.size} pedido(s) del usuario han sido eliminados en un batch.`);
+      console.log(`✅ [Firestore] ${pedidosSnapshot.size} pedido(s) eliminados.`);
+    } else {
+      console.log("ℹ️ [Firestore] Sin pedidos del usuario.");
     }
 
-    // Si todos los pasos fueron exitosos, retornamos un mensaje de éxito.
-    return { status: "ok", mensaje: `Usuario ${uid} y todos sus datos han sido eliminados completamente.` };
+    // 4️⃣ Eliminar cualquier otro rastro del usuario en otras colecciones (ej: users)
+    const userDoc = firestore.collection("users").doc(uid);
+    await userDoc.delete().then(() => {
+      console.log("✅ [Firestore] Documento del usuario eliminado de colección 'users'.");
+    }).catch(() => {
+      console.log("ℹ️ [Firestore] No había documento en 'users'.");
+    });
+
+    return {
+      status: "ok",
+      mensaje: `✅ Usuario ${uid} eliminado completamente de Auth, Realtime DB y Firestore.`
+    };
 
   } catch (error) {
-    console.error(`❌ Error crítico durante la eliminación del usuario ${uid}:`, error);
+    console.error("❌ Error al eliminar usuario:", error);
 
-    // Personalizamos el mensaje de error para los casos más comunes y evitar exponer detalles internos.
-    if (error.code === 'auth/user-not-found') {
-      return { status: "error", mensaje: `Operación fallida: El usuario con UID ${uid} no existe en Firebase Authentication.` };
+    if (error.code === "auth/user-not-found") {
+      return {
+        status: "error",
+        mensaje: `❗ El usuario con UID ${uid} no existe en Authentication.`
+      };
     }
-    
-    // Para cualquier otro tipo de error, devolvemos un mensaje genérico.
-    return { status: "error", mensaje: "Ocurrió un error inesperado en el servidor al intentar eliminar el usuario." };
+
+    return {
+      status: "error",
+      mensaje: "❌ Error inesperado al eliminar el usuario."
+    };
   }
 }
