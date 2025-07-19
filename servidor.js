@@ -43,29 +43,38 @@ app.post("/correo", async (req, res) => {
 
 // Endpoint para eliminar un usuario de todos los servicios de Firebase
 app.post("/eliminar-usuario", async (req, res) => {
-  const { uid } = req.body;
-  console.log(`🟡 Petición recibida en el endpoint /eliminar-usuario para el UID: ${uid}`);
+  const { email } = req.body;
+  console.log(`🟡 Petición recibida en el endpoint /eliminar-usuario para el correo: ${email}`);
 
   // 1. Validación de la entrada
-  if (!uid) {
-    return res.status(400).json({ status: "error", mensaje: "El campo 'uid' del usuario es requerido." });
+  if (!email) {
+    return res.status(400).json({
+      status: "error",
+      mensaje: "El campo 'email' del usuario es requerido."
+    });
   }
 
-  // 2. Delegación a la lógica de negocio
-  const resultado = await eliminarUsuario(uid);
-  
-  // 3. Envío de la respuesta al cliente con el código HTTP apropiado
-  if (resultado.status === 'ok') {
-    return res.status(200).json(resultado);
-  }
-  
-  // Si el error es que el usuario no fue encontrado, usamos el código 404
-  if (resultado.mensaje.includes("no existe")) {
-    return res.status(404).json(resultado); // 404 Not Found
-  }
+  try {
+    // 2. Delegación a la lógica de negocio
+    const resultado = await eliminarUsuarioPorCorreo(email);
 
-  // Para cualquier otro error, es un fallo interno del servidor
-  return res.status(500).json(resultado);
+    // 3. Envío de la respuesta al cliente con el código HTTP apropiado
+    if (resultado.status === "ok") {
+      return res.status(200).json(resultado); // 200 OK
+    }
+
+    if (resultado.mensaje.includes("no existe")) {
+      return res.status(404).json(resultado); // 404 Not Found
+    }
+
+    return res.status(500).json(resultado); // 500 Internal Server Error
+  } catch (error) {
+    console.error("❌ Error inesperado en el endpoint /eliminar-usuario:", error);
+    return res.status(500).json({
+      status: "error",
+      mensaje: "❌ Error interno del servidor."
+    });
+  }
 });
 
 // --- INICIO DEL SERVIDOR ---
