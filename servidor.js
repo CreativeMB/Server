@@ -41,12 +41,11 @@ app.post("/correo", async (req, res) => {
   }
 });
 
-// Endpoint para eliminar un usuario de todos los servicios de Firebase
+// 🗑️ Endpoint para eliminar usuario por correo
 app.post("/eliminar-usuario", async (req, res) => {
   const { email } = req.body;
   console.log(`🟡 Petición recibida en el endpoint /eliminar-usuario para el correo: ${email}`);
 
-  // 1. Validación de la entrada
   if (!email) {
     return res.status(400).json({
       status: "error",
@@ -55,19 +54,17 @@ app.post("/eliminar-usuario", async (req, res) => {
   }
 
   try {
-    // 2. Delegación a la lógica de negocio
     const resultado = await eliminarUsuario(email);
 
-    // 3. Envío de la respuesta al cliente con el código HTTP apropiado
     if (resultado.status === "ok") {
-      return res.status(200).json(resultado); // 200 OK
+      return res.status(200).json(resultado);
     }
 
     if (resultado.mensaje.includes("no existe")) {
-      return res.status(404).json(resultado); // 404 Not Found
+      return res.status(404).json(resultado);
     }
 
-    return res.status(500).json(resultado); // 500 Internal Server Error
+    return res.status(500).json(resultado);
   } catch (error) {
     console.error("❌ Error inesperado en el endpoint /eliminar-usuario:", error);
     return res.status(500).json({
@@ -76,7 +73,6 @@ app.post("/eliminar-usuario", async (req, res) => {
     });
   }
 });
-
 // --- INICIO DEL SERVIDOR ---
 
 // Usamos el puerto que nos asigne el entorno (como Fly.io) o el 3001 si no hay ninguno definido.
