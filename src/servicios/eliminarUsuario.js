@@ -5,44 +5,43 @@ import { auth, firestore, db } from "./firebase.js";
 /**
  * Elimina completamente un usuario de Auth, Firestore y Realtime DB.
  *
- * @param {string} uid - UID del usuario a eliminar.
+ * @param {string} uid - UID del usuario en Firebase Auth
  * @returns {Promise<{status: string, mensaje: string}>}
  */
 export default async function eliminarUsuario(uid) {
   if (!uid) {
     return {
       status: "error",
-      mensaje: "❌ UID y correo requeridos para eliminar el usuario."
+      mensaje: "❌ UID requerido para eliminar el usuario."
     };
   }
 // Codificar correo para usarlo como clave del nodo en Realtime DB
   console.log(`🟡 Iniciando eliminación completa del usuario UID: ${uid}`);
 
   try {
-    // 1️⃣ Eliminar de Authentication
+    // 1️⃣ Eliminar usuario de Firebase Authentication
     await auth.deleteUser(uid);
     console.log("✅ [Auth] Usuario eliminado de Firebase Authentication.");
 
-    // 2️⃣ Eliminar completamente el nodo del usuario en Realtime Database
-   const usuariosRef = db.ref("usuarios");
+    // 2️⃣ Buscar y eliminar el nodo en Realtime Database por userId
+    const usuariosRef = db.ref("usuarios");
     const snapshot = await usuariosRef.once("value");
 
-   let correoKeyEncontrado = null;
+    let nodoEncontrado = null;
 
     snapshot.forEach(childSnapshot => {
       const data = childSnapshot.val();
       if (data.userId === uid) {
-        correoKeyEncontrado = childSnapshot.key; // ← nombre del nodo
+        nodoEncontrado = childSnapshot.key;
       }
     });
 
-    if (correoKeyEncontrado) {
-      await usuariosRef.child(correoKeyEncontrado).remove();
-      console.log(`✅ [Realtime DB] Nodo del usuario eliminado: /usuarios/${correoKeyEncontrado}`);
+    if (nodoEncontrado) {
+      await usuariosRef.child(nodoEncontrado).remove();
+      console.log(`✅ [Realtime DB] Nodo eliminado: /usuarios/${nodoEncontrado}`);
     } else {
-      console.log("ℹ️ [Realtime DB] No se encontró nodo con ese userId.");
+      console.log("ℹ️ [Realtime DB] No se encontró el nodo con ese userId.");
     }
-
     // 3️⃣ Eliminar todos sus pedidos en Firestore
     const pedidosSnapshot = await firestore
       .collection("pedidosmovies")
