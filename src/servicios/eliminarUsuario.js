@@ -48,36 +48,21 @@ export default async function eliminarUsuario(email) {
     console.log(`✅ [Realtime DB] Nodo eliminado: usuarios/${correoKey}`);
 
     // 3️⃣ Eliminar pedidos del usuario en Firestore
-    const pedidosSnapshot = await firestore
+    const pedidosSnap = await firestore
       .collection("pedidosmovies")
       .where("userId", "==", uid)
       .get();
 
-    if (!pedidosSnapshot.empty) {
+    if (!pedidosSnap.empty) {
       const batch = firestore.batch();
-      pedidosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+      pedidosSnap.docs.forEach(doc => batch.delete(doc.ref));
       await batch.commit();
-      console.log(`✅ [Firestore] ${pedidosSnapshot.size} pedido(s) eliminados.`);
+      console.log(`✅ [Firestore] ${pedidosSnap.size} pedido(s) eliminados.`);
     } else {
       console.log("ℹ️ [Firestore] Sin pedidos del usuario.");
     }
 
-    // 3️⃣ Eliminar todos los pedidos del usuario en Firestore
-    const pedidosSnapshot = await firestore
-      .collection("pedidosmovies")
-      .where("userId", "==", uid)
-      .get();
-
-    if (!pedidosSnapshot.empty) {
-      const batch = firestore.batch();
-      pedidosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-      console.log(`✅ [Firestore] ${pedidosSnapshot.size} pedido(s) eliminados.`);
-    } else {
-      console.log("ℹ️ [Firestore] Sin pedidos del usuario.");
-    }
-
-  // 4️⃣ Eliminar documento en colección 'users'
+    // 4️⃣ Eliminar documento en colección 'users'
     const userDocRef = firestore.collection("users").doc(uid);
     const userDoc = await userDocRef.get();
 
