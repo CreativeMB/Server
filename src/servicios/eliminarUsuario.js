@@ -8,14 +8,15 @@ import { auth, firestore, db } from "./firebase.js";
  * @param {string} uid - UID del usuario a eliminar.
  * @returns {Promise<{status: string, mensaje: string}>}
  */
-export default async function eliminarUsuario(uid) {
-  if (!uid) {
+export default async function eliminarUsuario(uid, email) {
+  if (!uid || !email) {
     return {
       status: "error",
-      mensaje: "❌ UID requerido para eliminar el usuario."
+      mensaje: "❌ UID y correo requeridos para eliminar el usuario."
     };
   }
-
+// Codificar correo para usarlo como clave del nodo en Realtime DB
+  const correoKey = email.replace(/\./g, "_").replace(/@/g, "_");
   console.log(`🟡 Iniciando eliminación completa del usuario UID: ${uid}`);
 
   try {
