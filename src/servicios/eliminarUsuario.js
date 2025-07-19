@@ -25,7 +25,9 @@ export default async function eliminarUsuario(uid, email) {
     console.log("✅ [Auth] Usuario eliminado de Firebase Authentication.");
 
     // 2️⃣ Eliminar completamente el nodo del usuario en Realtime Database
-    const usuarioRef = db.ref("usuarios").child(uid);
+   const correoKey = email.replace(/\./g, "_").replace(/@/g, "_");
+const usuarioRef = db.ref("usuarios").child(correoKey);
+
     await usuarioRef.remove();
     console.log("✅ [Realtime DB] Nodo del usuario eliminado de /usuarios.");
 
