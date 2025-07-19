@@ -3,27 +3,33 @@
 import { auth, firestore, db } from "./firebase.js";
 
 /**
- * Elimina completamente un usuario de Auth, Firestore y Realtime DB.
+ * Elimina completamente un usuario por su correo,
+ * incluyendo Auth, Firestore y Realtime Database.
  *
- * @param {string} uid - UID del usuario en Firebase Auth
+ * @param {string} email - Correo del usuario (ej: "usuario@gmail.com")
  * @returns {Promise<{status: string, mensaje: string}>}
  */
-export default async function eliminarUsuario(uid) {
-  if (!uid) {
+export default async function eliminarUsuarioPorCorreo(email) {
+  if (!email) {
     return {
       status: "error",
-      mensaje: "❌ UID requerido para eliminar el usuario."
+      mensaje: "❌ Correo requerido para eliminar el usuario."
     };
   }
-// Codificar correo para usarlo como clave del nodo en Realtime DB
-  console.log(`🟡 Iniciando eliminación completa del usuario UID: ${uid}`);
 
   try {
+    console.log(`🟡 Buscando UID de ${email}...`);
+    const userRecord = await auth.getUserByEmail(email);
+    const uid = userRecord.uid;
+
+    console.log(`✅ UID encontrado: ${uid}`);
+    console.log(`🟡 Iniciando eliminación completa del usuario UID: ${uid}`);
+
     // 1️⃣ Eliminar usuario de Firebase Authentication
     await auth.deleteUser(uid);
     console.log("✅ [Auth] Usuario eliminado de Firebase Authentication.");
 
-    // 2️⃣ Buscar y eliminar el nodo en Realtime Database por userId
+    // 2️⃣ Buscar y eliminar nodo del usuario en Realtime Database (por userId)
     const usuariosRef = db.ref("usuarios");
     const snapshot = await usuariosRef.once("value");
 
@@ -40,9 +46,10 @@ export default async function eliminarUsuario(uid) {
       await usuariosRef.child(nodoEncontrado).remove();
       console.log(`✅ [Realtime DB] Nodo eliminado: /usuarios/${nodoEncontrado}`);
     } else {
-      console.log("ℹ️ [Realtime DB] No se encontró el nodo con ese userId.");
+      console.log("ℹ️ [Realtime DB] No se encontró nodo con ese userId.");
     }
-    // 3️⃣ Eliminar todos sus pedidos en Firestore
+
+    // 3️⃣ Eliminar todos los pedidos del usuario en Firestore
     const pedidosSnapshot = await firestore
       .collection("pedidosmovies")
       .where("userId", "==", uid)
@@ -57,13 +64,16 @@ export default async function eliminarUsuario(uid) {
       console.log("ℹ️ [Firestore] Sin pedidos del usuario.");
     }
 
-    // 4️⃣ Eliminar cualquier otro rastro del usuario en otras colecciones (ej: users)
+    // 4️⃣ Eliminar documento en colección 'users'
     const userDoc = firestore.collection("users").doc(uid);
-    await userDoc.delete().then(() => {
+    const userDocSnap = await userDoc.get();
+
+    if (userDocSnap.exists) {
+      await userDoc.delete();
       console.log("✅ [Firestore] Documento del usuario eliminado de colección 'users'.");
-    }).catch(() => {
-      console.log("ℹ️ [Firestore] No había documento en 'users'.");
-    });
+    } else {
+      console.log("ℹ️ [Firestore] Documento no existe en colección 'users'.");
+    }
 
     return {
       status: "ok",
@@ -76,7 +86,7 @@ export default async function eliminarUsuario(uid) {
     if (error.code === "auth/user-not-found") {
       return {
         status: "error",
-        mensaje: `❗ El usuario con UID ${uid} no existe en Authentication.`
+        mensaje: `❗ No existe un usuario con el correo ${email}.`
       };
     }
 
@@ -86,3 +96,4 @@ export default async function eliminarUsuario(uid) {
     };
   }
 }
+
