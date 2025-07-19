@@ -9,7 +9,7 @@ import { auth, firestore, db } from "./firebase.js";
  * @param {string} email - Correo del usuario (ej: "usuario@gmail.com")
  * @returns {Promise<{status: string, mensaje: string}>}
  */
-export default async function eliminarUsuarioPorCorreo(email) {
+export default async function eliminarUsuario(email) {
   if (!email) {
     return {
       status: "error",
