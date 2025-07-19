@@ -3,8 +3,8 @@
 import { auth, firestore, db } from "./firebase.js";
 
 /**
- * Elimina completamente un usuario por su correo,
- * incluyendo Auth, Firestore y Realtime Database.
+ * Elimina completamente un usuario por su correo codificado (clave en Realtime DB),
+ * incluyendo Firebase Authentication, Realtime Database y Firestore.
  *
  * @param {string} email - Correo del usuario (ej: "usuario@gmail.com")
  * @returns {Promise<{status: string, mensaje: string}>}
@@ -17,36 +17,49 @@ export default async function eliminarUsuario(email) {
     };
   }
 
+  // Codificar correo como clave válida en Firebase
+  const correoKey = email.replace(/\./g, "_").replace(/@/g, "_");
+  const usuarioRef = db.ref("usuarios").child(correoKey);
+
   try {
-    console.log(`🟡 Buscando UID de ${email}...`);
-    const userRecord = await auth.getUserByEmail(email);
-    const uid = userRecord.uid;
+    console.log(`🟡 Verificando nodo: usuarios/${correoKey}`);
 
-    console.log(`✅ UID encontrado: ${uid}`);
-    console.log(`🟡 Iniciando eliminación completa del usuario UID: ${uid}`);
+    // Obtener el nodo del usuario directamente
+    const snapshot = await usuarioRef.once("value");
 
-    // 1️⃣ Eliminar usuario de Firebase Authentication
+    if (!snapshot.exists()) {
+      return {
+        status: "error",
+        mensaje: `❗ No se encontró el nodo de usuario con correo: ${email}`
+      };
+    }
+
+    const data = snapshot.val();
+    const uid = data.userId;
+
+    console.log(`✅ Nodo encontrado. UID del usuario: ${uid}`);
+
+    // 1️⃣ Eliminar de Firebase Authentication
     await auth.deleteUser(uid);
     console.log("✅ [Auth] Usuario eliminado de Firebase Authentication.");
 
-    // 2️⃣ Buscar y eliminar nodo del usuario en Realtime Database (por userId)
-    const usuariosRef = db.ref("usuarios");
-    const snapshot = await usuariosRef.once("value");
+    // 2️⃣ Eliminar el nodo del usuario en Realtime DB
+    await usuarioRef.remove();
+    console.log(`✅ [Realtime DB] Nodo eliminado: usuarios/${correoKey}`);
 
-    let nodoEncontrado = null;
+    // 3️⃣ Eliminar pedidos del usuario en Firestore
+    const pedidosSnapshot = await firestore
+      .collection("pedidosmovies")
+      .where("userId", "==", uid)
+      .get();
 
-    snapshot.forEach(childSnapshot => {
-      const data = childSnapshot.val();
-      if (data.userId === uid) {
-        nodoEncontrado = childSnapshot.key;
-      }
-    });
-
-    if (nodoEncontrado) {
-      await usuariosRef.child(nodoEncontrado).remove();
-      console.log(`✅ [Realtime DB] Nodo eliminado: /usuarios/${nodoEncontrado}`);
+    if (!pedidosSnapshot.empty) {
+      const batch = firestore.batch();
+      pedidosSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      console.log(`✅ [Firestore] ${pedidosSnapshot.size} pedido(s) eliminados.`);
     } else {
-      console.log("ℹ️ [Realtime DB] No se encontró nodo con ese userId.");
+      console.log("ℹ️ [Firestore] Sin pedidos del usuario.");
     }
 
     // 3️⃣ Eliminar todos los pedidos del usuario en Firestore
@@ -64,13 +77,13 @@ export default async function eliminarUsuario(email) {
       console.log("ℹ️ [Firestore] Sin pedidos del usuario.");
     }
 
-    // 4️⃣ Eliminar documento en colección 'users'
-    const userDoc = firestore.collection("users").doc(uid);
-    const userDocSnap = await userDoc.get();
+  // 4️⃣ Eliminar documento en colección 'users'
+    const userDocRef = firestore.collection("users").doc(uid);
+    const userDoc = await userDocRef.get();
 
-    if (userDocSnap.exists) {
-      await userDoc.delete();
-      console.log("✅ [Firestore] Documento del usuario eliminado de colección 'users'.");
+    if (userDoc.exists) {
+      await userDocRef.delete();
+      console.log("✅ [Firestore] Documento eliminado de colección 'users'.");
     } else {
       console.log("ℹ️ [Firestore] Documento no existe en colección 'users'.");
     }
@@ -96,4 +109,3 @@ export default async function eliminarUsuario(email) {
     };
   }
 }
-
