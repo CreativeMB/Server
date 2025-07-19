@@ -56,7 +56,7 @@ app.post("/eliminar-usuario", async (req, res) => {
 
   try {
     // 2. Delegación a la lógica de negocio
-    const resultado = await eliminarUsuarioPorCorreo(email);
+    const resultado = await eliminarUsuario(email);
 
     // 3. Envío de la respuesta al cliente con el código HTTP apropiado
     if (resultado.status === "ok") {
